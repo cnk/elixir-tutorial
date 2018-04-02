@@ -26,11 +26,19 @@ defmodule Servy.Handler do
     %{ conv | path: "/wildthings" }
   end
 
-  def rewrite( %{path: "/bears?id=" <> id } = conv) do
-    %{ conv | path: "/bears/#{id}" }
+  def rewrite( %{path: path} = conv) do
+    regex = ~r{\/(?<thing>\w+)\?id=(?<id>\d+)}
+    captures = Regex.named_captures(regex, path)
+    rewrite_id_captures(conv, captures)
   end
 
   def rewrite(conv), do: conv
+
+  def rewrite_id_captures(conv, %{"thing" => thing, "id" => id}) do
+    %{conv | path: "/#{thing}/#{id}"}
+  end
+
+  def rewrite_id_captures(conv, nil), do: conv
 
   def route( %{method: "GET", path: "/wildthings"} = conv) do
     %{ conv | status: 200, resp_body: "Lions, Tigers, Bears" }
@@ -44,7 +52,7 @@ defmodule Servy.Handler do
     %{ conv | status: 200, resp_body: "Teddy, Smokey, Paddington" }
   end
 
-  def route( %{method: "DELETE", path: "/bears/" <> id} = conv) do
+  def route( %{method: "DELETE", path: "/bears/" <> _id} = conv) do
     %{ conv | status: 204 }
   end
 
