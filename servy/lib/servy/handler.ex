@@ -16,17 +16,21 @@ defmodule Servy.Handler do
     [method, path, _] =
       request
       |> String.split("\n")
-      |> List.first
+      |> List.first()
       |> String.split(" ")
 
-    %{ method: method, path: path, resp_body: "", status: nil }
+    %{method: method, path: path, resp_body: "", status: nil}
   end
 
-  def rewrite( %{path: "/wildlife"} = conv) do
-    %{ conv | path: "/wildthings" }
+  def rewrite(%{path: "/wildlife"} = conv) do
+    %{conv | path: "/wildthings"}
   end
 
-  def rewrite( %{path: path} = conv) do
+  def rewrite(%{path: "/bears/new"} = conv) do
+    %{conv | path: "/form"}
+  end
+
+  def rewrite(%{path: path} = conv) do
     regex = ~r{\/(?<thing>\w+)\?id=(?<id>\d+)}
     captures = Regex.named_captures(regex, path)
     rewrite_id_captures(conv, captures)
@@ -40,29 +44,57 @@ defmodule Servy.Handler do
 
   def rewrite_id_captures(conv, nil), do: conv
 
-  def route( %{method: "GET", path: "/wildthings"} = conv) do
-    %{ conv | status: 200, resp_body: "Lions, Tigers, Bears" }
+  def route(%{method: "GET", path: "/wildthings"} = conv) do
+    %{conv | status: 200, resp_body: "Lions, Tigers, Bears"}
   end
 
-  def route( %{method: "GET", path: "/bears/" <> id } = conv) do
-    %{ conv | status: 200, resp_body: "Bear #{id}" }
+  # CNK this is the original version, but changed to rewrite rule above 
+  #     once we had a rewrite step in our overall pipeline
+  # def route(%{method: "GET", path: "/bears/new"} = conv) do
+  #   Path.expand("../../pages", __DIR__)
+  #   |> Path.join("form.html")
+  #   |> File.read()
+  #   |> handle_file(conv)
+  # end
+
+  def route(%{method: "GET", path: "/bears/" <> id} = conv) do
+    %{conv | status: 200, resp_body: "Bear #{id}"}
   end
 
-  def route( %{method: "GET", path: "/bears"} = conv) do
-    %{ conv | status: 200, resp_body: "Teddy, Smokey, Paddington" }
+  def route(%{method: "GET", path: "/bears"} = conv) do
+    %{conv | status: 200, resp_body: "Teddy, Smokey, Paddington"}
   end
 
-  def route( %{method: "DELETE", path: "/bears/" <> _id} = conv) do
-    %{ conv | status: 204 }
+  def route(%{method: "DELETE", path: "/bears/" <> _id} = conv) do
+    %{conv | status: 204}
   end
 
-  def route( %{path: path} = conv) do
-    %{ conv | status: 404, resp_body: "No #{path} here." }
+  def route(%{method: "GET", path: path} = conv) do
+    Path.expand("../../pages", __DIR__)
+    |> Path.join(path <> ".html")
+    |> File.read()
+    |> handle_file(conv)
+  end
+
+  def handle_file({:ok, contents}, conv) do
+    %{conv | status: 200, resp_body: contents}
+  end
+
+  def handle_file({:error, :enoent}, conv) do
+    %{conv | status: 404, resp_body: "File not found."}
+  end
+
+  def handle_file({:error, reason}, conv) do
+    %{conv | status: 500, resp_body: "ERROR: #{reason}"}
+  end
+
+  def route(%{path: path} = conv) do
+    %{conv | status: 404, resp_body: "No #{path} here."}
   end
 
   def emojify(%{status: 200} = conv) do
     body = "\u{1F60E}" <> " " <> conv.resp_body <> "\u{1F60E}" <> " "
-    %{ conv | resp_body: body }
+    %{conv | resp_body: body}
   end
 
   def emojify(conv), do: conv
@@ -88,7 +120,6 @@ defmodule Servy.Handler do
       500 => "Internal Server Error"
     }[code]
   end
-
 end
 
 request = """
@@ -101,4 +132,4 @@ Accept: */*
 
 response = Servy.Handler.handle(request)
 
-IO.puts response
+IO.puts(response)
